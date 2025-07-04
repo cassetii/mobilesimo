@@ -1,470 +1,939 @@
-import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, MapPin, Users, Video, Bell, Settings, Search, ChevronRight, Filter, Wifi, WifiOff, Building, User } from 'lucide-react';
-
-const SIMOSchedule = () => {
-  const [activeTab, setActiveTab] = useState('today');
-  const [meetings, setMeetings] = useState([]);
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const [isOnline, setIsOnline] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Firebase configuration
-  const firebaseConfig = {
-    apiKey: "AIzaSyAmTSUEiLX0K1A8mPnN0citZmDAuzLkL_A",
-    authDomain: "rapat-simo-15b35.firebaseapp.com",
-    projectId: "rapat-simo-15b35",
-    storageBucket: "rapat-simo-15b35.firebasestorage.app",
-    messagingSenderId: "471527167515",
-    appId: "1:471527167515:web:7766a3f2ee1d6280e9cabe",
-    measurementId: "G-FCPTBCPHMB"
-  };
-
-  // Sample data sebagai fallback
-  const sampleMeetings = [
-    {
-      id: "1",
-      pembuat: "Dept.Perencanaan Strategis & Kinerja Organisasi",
-      tempat: "ZOOM",
-      audience: ["Daya Inara"],
-      keterangan: "Join Planning Session Roadmap RAKB",
-      tanggal: "2025-07-07",
-      jam: "14:30"
-    },
-    {
-      id: "2", 
-      pembuat: "DIVISI SIMO",
-      tempat: "Hotel Claro Makassar",
-      audience: ["Direksi Bank Sulselbar"],
-      keterangan: "Sosialisasi Inhouse Training PT Bank Sulselbar (Pemimpin Divisi, Claro)",
-      tanggal: "2025-07-08",
-      jam: "08:00"
-    },
-    {
-      id: "3",
-      pembuat: "Dept.Perencanaan Strategis & Kinerja Organisasi", 
-      tempat: "Ruang Rapat Lt 3 Gedung A PT Bank Sulselbar",
-      audience: ["DCS", "DHC", "DDL", "DSY", "DIB", "DKK", "DRK", "SKK", "SKMR"],
-      keterangan: "Kick Off Meeting Pelaksanaan Penyusunan Dokumen Roadmap RAKB tahun 2026-2030 dan Kebijakan atau Ketentuan",
-      tanggal: "2025-07-08", 
-      jam: "10:00"
-    }
-  ];
-
-  // Load Firebase data
-  const loadFirebaseData = async () => {
-    try {
-      setIsLoading(true);
-      
-      // Import Firebase modules
-      const firebaseApp = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js');
-      const firestore = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js');
-      
-      // Initialize Firebase
-      const app = firebaseApp.initializeApp(firebaseConfig);
-      const db = firestore.getFirestore(app);
-      
-      // Create query
-      const meetingsQuery = firestore.query(
-        firestore.collection(db, "meetings"), 
-        firestore.orderBy("tanggal", "asc")
-      );
-      
-      // Listen to real-time updates
-      const unsubscribe = firestore.onSnapshot(meetingsQuery, 
-        (querySnapshot) => {
-          const meetingsData = [];
-          querySnapshot.forEach((doc) => {
-            meetingsData.push({
-              id: doc.id,
-              ...doc.data()
-            });
-          });
-          
-          setMeetings(meetingsData);
-          setIsOnline(true);
-          setIsLoading(false);
-          console.log(`Loaded ${meetingsData.length} meetings from Firebase`);
-        }, 
-        (error) => {
-          console.error("Error loading Firebase data:", error);
-          setIsOnline(false);
-          setMeetings(sampleMeetings);
-          setIsLoading(false);
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIMO Schedule - Meeting Dashboard</title>
+    
+    <!-- Bootstrap 5.3.2 CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome 6.4.0 -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary-blue: #023259;
+            --primary-green: #99bb1c;
+            --light-blue: rgba(2, 50, 89, 0.1);
+            --light-green: rgba(153, 187, 28, 0.1);
+            --gradient-bg: linear-gradient(45deg, #023259, #99bb1c);
         }
-      );
-      
-      return unsubscribe;
-    } catch (error) {
-      console.error("Firebase connection failed:", error);
-      setIsOnline(false);
-      setMeetings(sampleMeetings);
-      setIsLoading(false);
-    }
-  };
 
-  useEffect(() => {
-    // Load Firebase data
-    let unsubscribe = null;
-    loadFirebaseData().then((unsub) => {
-      unsubscribe = unsub;
-    });
-    
-    // Update waktu setiap detik
-    const timeInterval = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
+        * {
+            box-sizing: border-box;
+        }
 
-    return () => {
-      clearInterval(timeInterval);
-      if (unsubscribe) {
-        unsubscribe();
-      }
-    };
-  }, []);
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('id-ID', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    });
-  };
+        .mobile-container {
+            max-width: 428px;
+            margin: 0 auto;
+            background: #f1f5f9;
+            min-height: 100vh;
+            position: relative;
+            box-shadow: 0 0 30px rgba(0,0,0,0.1);
+        }
 
-  const isToday = (dateString) => {
-    const today = new Date();
-    const meetingDate = new Date(dateString);
-    return today.toDateString() === meetingDate.toDateString();
-  };
+        /* Header Styles */
+        .header-section {
+            background: var(--gradient-bg);
+            color: white;
+            padding: 2rem 1.5rem;
+            position: relative;
+            overflow: hidden;
+        }
 
-  const isUpcoming = (dateString) => {
-    const today = new Date();
-    const meetingDate = new Date(dateString);
-    return meetingDate > today;
-  };
+        .header-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.1);
+            z-index: 1;
+        }
 
-  const todayMeetings = meetings.filter(meeting => isToday(meeting.tanggal));
-  const upcomingMeetings = meetings.filter(meeting => isUpcoming(meeting.tanggal));
+        .header-bg-circle {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.1);
+            animation: pulse 3s infinite;
+        }
 
-  const stats = {
-    totalMeetings: meetings.length,
-    todayMeetings: todayMeetings.length,
-    upcomingMeetings: upcomingMeetings.length,
-    completedMeetings: meetings.length - upcomingMeetings.length - todayMeetings.length
-  };
+        .circle-1 {
+            width: 80px;
+            height: 80px;
+            top: 1rem;
+            right: 1rem;
+            animation-delay: 0s;
+        }
 
-  const MeetingCard = ({ meeting, showDate = true }) => {
-    const isOnlineLocation = meeting.tempat?.toLowerCase().includes('zoom') || 
-                           meeting.tempat?.toLowerCase().includes('teams') ||
-                           meeting.tempat?.toLowerCase().includes('meet');
-    
-    return (
-      <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 mb-4">
-        <div className="flex items-start space-x-3">
-          <div className="flex-shrink-0">
-            <div className={`p-3 rounded-xl ${isOnlineLocation ? 'bg-blue-500' : 'bg-green-500'}`}>
-              {isOnlineLocation ? (
-                <Video className="w-6 h-6 text-white" />
-              ) : (
-                <MapPin className="w-6 h-6 text-white" />
-              )}
-            </div>
-          </div>
-          
-          <div className="flex-1 min-w-0">
-            {showDate && (
-              <div className="flex items-center space-x-2 mb-2">
-                <div className="flex items-center space-x-1 text-sm text-gray-600">
-                  <Clock className="w-4 h-4" />
-                  <span>{meeting.jam}</span>
+        .circle-2 {
+            width: 60px;
+            height: 60px;
+            bottom: 1rem;
+            left: 1rem;
+            animation-delay: 1s;
+        }
+
+        .header-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .header-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            animation: slideInLeft 0.6s ease-out;
+        }
+
+        .header-subtitle {
+            color: rgba(255,255,255,0.8);
+            font-size: 0.875rem;
+            margin-bottom: 1rem;
+            animation: slideInLeft 0.6s ease-out 0.2s both;
+        }
+
+        .header-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            font-size: 0.75rem;
+            animation: slideInLeft 0.6s ease-out 0.4s both;
+        }
+
+        .status-online {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            color: #86efac;
+        }
+
+        .status-icon {
+            animation: pulse 2s infinite;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 0.75rem;
+            animation: slideInRight 0.6s ease-out;
+        }
+
+        .header-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            border-radius: 1rem;
+            padding: 0.75rem;
+            color: white;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .header-btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: scale(1.1);
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            width: 12px;
+            height: 12px;
+            background: #ef4444;
+            border-radius: 50%;
+            animation: ping 2s infinite;
+        }
+
+        /* Stats Cards */
+        .stats-section {
+            padding: 1.5rem;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 1rem;
+            padding: 1.25rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            border: 1px solid rgba(226,232,240,0.8);
+            transition: all 0.3s ease;
+            margin-bottom: 1rem;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+        }
+
+        .stat-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .stat-info h3 {
+            font-size: 0.875rem;
+            color: #64748b;
+            margin: 0 0 0.5rem 0;
+            font-weight: 500;
+        }
+
+        .stat-info p {
+            font-size: 1.875rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin: 0;
+        }
+
+        .stat-icon {
+            padding: 0.75rem;
+            border-radius: 0.75rem;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .icon-blue { background: #3b82f6; }
+        .icon-green { background: #10b981; }
+        .icon-orange { background: #f59e0b; }
+        .icon-purple { background: #8b5cf6; }
+
+        /* Navigation Tabs */
+        .nav-section {
+            background: white;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .nav-tabs-custom {
+            display: flex;
+            gap: 0.5rem;
+            border: none;
+        }
+
+        .nav-tab {
+            flex: 1;
+            background: #f1f5f9;
+            border: none;
+            border-radius: 0.75rem;
+            padding: 0.75rem 1rem;
+            color: #64748b;
+            font-weight: 500;
+            font-size: 0.875rem;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .nav-tab.active {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .nav-tab:hover:not(.active) {
+            background: #e2e8f0;
+        }
+
+        .tab-badge {
+            background: rgba(255,255,255,0.2);
+            padding: 0.25rem 0.5rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .tab-badge.inactive {
+            background: #3b82f6;
+            color: white;
+        }
+
+        /* Content Section */
+        .content-section {
+            padding: 1.5rem;
+            min-height: 400px;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin: 0;
+        }
+
+        .section-info {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #64748b;
+            font-size: 0.875rem;
+        }
+
+        /* Meeting Cards */
+        .meeting-card {
+            background: white;
+            border-radius: 1rem;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            border: 1px solid rgba(226,232,240,0.8);
+            transition: all 0.3s ease;
+        }
+
+        .meeting-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+        }
+
+        .meeting-content {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .meeting-icon {
+            flex-shrink: 0;
+            width: 48px;
+            height: 48px;
+            border-radius: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+
+        .meeting-icon.online { background: #3b82f6; }
+        .meeting-icon.offline { background: #10b981; }
+
+        .meeting-details {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .meeting-time {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+            font-size: 0.875rem;
+            color: #64748b;
+        }
+
+        .time-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .meeting-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #1e293b;
+            line-height: 1.4;
+            margin-bottom: 0.75rem;
+        }
+
+        .meeting-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+        }
+
+        .info-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #64748b;
+        }
+
+        .info-icon {
+            width: 12px;
+            height: 12px;
+            color: #94a3b8;
+        }
+
+        .audience-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.25rem;
+            margin-top: 0.25rem;
+        }
+
+        .audience-badge {
+            background: #1e293b;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.5rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+
+        .meeting-arrow {
+            color: #cbd5e1;
+            font-size: 1.25rem;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #64748b;
+        }
+
+        .empty-icon {
+            font-size: 4rem;
+            color: #cbd5e1;
+            margin-bottom: 1rem;
+        }
+
+        .empty-title {
+            font-size: 1rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+
+        .empty-subtitle {
+            font-size: 0.875rem;
+            color: #94a3b8;
+        }
+
+        /* Loading State */
+        .loading-state {
+            text-align: center;
+            padding: 3rem 1rem;
+        }
+
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid #e2e8f0;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        /* Bottom Navigation */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            max-width: 428px;
+            background: white;
+            border-top: 1px solid #e2e8f0;
+            padding: 1rem 1.5rem;
+            z-index: 100;
+        }
+
+        .nav-items {
+            display: flex;
+            justify-content: space-around;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.25rem;
+            color: #64748b;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .nav-item.active {
+            color: #3b82f6;
+        }
+
+        .nav-item i {
+            font-size: 1.25rem;
+        }
+
+        .nav-item span {
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        /* Animations */
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        @keyframes ping {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            75%, 100% {
+                transform: scale(2);
+                opacity: 0;
+            }
+        }
+
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 428px) {
+            .mobile-container {
+                max-width: 100%;
+            }
+            
+            .bottom-nav {
+                max-width: 100%;
+            }
+        }
+
+        /* Padding for bottom nav */
+        .content-padding {
+            padding-bottom: 100px;
+        }
+    </style>
+</head>
+<body>
+    <div class="mobile-container">
+        <!-- Header Section -->
+        <header class="header-section">
+            <div class="header-bg-circle circle-1"></div>
+            <div class="header-bg-circle circle-2"></div>
+            
+            <div class="header-content">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h1 class="header-title">SIMO Schedule</h1>
+                        <p class="header-subtitle">Meeting Planner - View Only</p>
+                        <div class="header-info">
+                            <div class="status-online">
+                                <i class="fas fa-wifi status-icon"></i>
+                                <span>Sample Data</span>
+                            </div>
+                            <span id="current-time"></span>
+                        </div>
+                    </div>
+                    <div class="header-actions">
+                        <button class="header-btn">
+                            <i class="fas fa-search"></i>
+                        </button>
+                        <button class="header-btn">
+                            <i class="fas fa-filter"></i>
+                        </button>
+                        <button class="header-btn position-relative">
+                            <i class="fas fa-bell"></i>
+                            <div class="notification-badge"></div>
+                        </button>
+                    </div>
                 </div>
-                <div className="text-sm text-gray-500">•</div>
-                <div className="text-sm text-gray-600">{formatDate(meeting.tanggal)}</div>
-              </div>
-            )}
-            
-            <h3 className="font-semibold text-gray-900 text-sm leading-tight mb-2">
-              {meeting.keterangan}
-            </h3>
-            
-            <div className="space-y-1 text-xs">
-              <div className="flex items-center space-x-1">
-                <MapPin className="w-3 h-3 text-gray-500" />
-                <span className="text-gray-600 truncate">{meeting.tempat}</span>
-              </div>
-              
-              <div className="flex items-center space-x-1">
-                <User className="w-3 h-3 text-gray-500" />
-                <span className="text-gray-600">Pembuat: {meeting.pembuat}</span>
-              </div>
-              
-              <div className="flex items-start space-x-1">
-                <Users className="w-3 h-3 text-gray-500 mt-0.5" />
-                <div className="flex-1">
-                  <span className="text-gray-600">Audience: </span>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {Array.isArray(meeting.audience) ? 
-                      meeting.audience.map((aud, idx) => (
-                        <span 
-                          key={idx} 
-                          className="inline-block px-2 py-1 text-xs font-semibold bg-black text-white rounded-lg"
-                        >
-                          {aud}
+            </div>
+        </header>
+
+        <!-- Stats Section -->
+        <section class="stats-section">
+            <div class="row g-3">
+                <div class="col-6">
+                    <div class="stat-card">
+                        <div class="stat-content">
+                            <div class="stat-info">
+                                <h3>Total Rapat</h3>
+                                <p id="total-meetings">3</p>
+                            </div>
+                            <div class="stat-icon icon-blue">
+                                <i class="fas fa-calendar-alt"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="stat-card">
+                        <div class="stat-content">
+                            <div class="stat-info">
+                                <h3>Hari Ini</h3>
+                                <p id="today-meetings">0</p>
+                            </div>
+                            <div class="stat-icon icon-green">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="stat-card">
+                        <div class="stat-content">
+                            <div class="stat-info">
+                                <h3>Akan Datang</h3>
+                                <p id="upcoming-meetings">3</p>
+                            </div>
+                            <div class="stat-icon icon-orange">
+                                <i class="fas fa-users"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="stat-card">
+                        <div class="stat-content">
+                            <div class="stat-info">
+                                <h3>Pembuat</h3>
+                                <p>5</p>
+                            </div>
+                            <div class="stat-icon icon-purple">
+                                <i class="fas fa-building"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Navigation Tabs -->
+        <section class="nav-section">
+            <div class="nav-tabs-custom">
+                <button class="nav-tab active" data-tab="today">
+                    Hari Ini
+                    <span class="tab-badge" id="today-badge">0</span>
+                </button>
+                <button class="nav-tab" data-tab="upcoming">
+                    Akan Datang
+                    <span class="tab-badge inactive" id="upcoming-badge">3</span>
+                </button>
+                <button class="nav-tab" data-tab="all">
+                    Semua
+                    <span class="tab-badge inactive" id="all-badge">3</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- Content Section -->
+        <section class="content-section content-padding">
+            <!-- Today Tab -->
+            <div id="today-content" class="tab-content active">
+                <div class="section-header">
+                    <h2 class="section-title">Rapat Hari Ini</h2>
+                    <div class="section-info">
+                        <i class="fas fa-clock"></i>
+                        <span id="current-date"></span>
+                    </div>
+                </div>
+                
+                <div id="today-meetings-list">
+                    <div class="empty-state">
+                        <div class="empty-icon">
+                            <i class="fas fa-calendar-times"></i>
+                        </div>
+                        <div class="empty-title">Tidak ada rapat hari ini</div>
+                        <div class="empty-subtitle">Nikmati hari yang santai! 🎉</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Upcoming Tab -->
+            <div id="upcoming-content" class="tab-content" style="display: none;">
+                <div class="section-header">
+                    <h2 class="section-title">Rapat Akan Datang</h2>
+                    <div class="section-info">
+                        <span class="badge bg-warning text-dark px-3 py-2 rounded-pill">
+                            <span id="upcoming-count">3</span> rapat
                         </span>
-                      )) :
-                      <span className="inline-block px-2 py-1 text-xs font-semibold bg-black text-white rounded-lg">
-                        {meeting.audience}
-                      </span>
-                    }
-                  </div>
+                    </div>
                 </div>
-              </div>
+                
+                <div id="upcoming-meetings-list"></div>
             </div>
-          </div>
-          
-          <div className="flex-shrink-0">
-            <ChevronRight className="w-5 h-5 text-gray-400" />
-          </div>
-        </div>
-      </div>
-    );
-  };
 
-  const StatCard = ({ title, value, color = 'bg-blue-500', icon: Icon }) => (
-    <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-gray-600">{title}</p>
-          <p className="text-2xl font-bold text-gray-900">{value}</p>
-        </div>
-        <div className={`p-3 rounded-xl ${color}`}>
-          <Icon className="w-6 h-6 text-white" />
-        </div>
-      </div>
+            <!-- All Tab -->
+            <div id="all-content" class="tab-content" style="display: none;">
+                <div class="section-header">
+                    <h2 class="section-title">Semua Rapat</h2>
+                    <div class="section-info">
+                        <span class="badge bg-primary px-3 py-2 rounded-pill">
+                            <span id="all-count">3</span> total
+                        </span>
+                    </div>
+                </div>
+                
+                <div id="all-meetings-list"></div>
+            </div>
+        </section>
+
+        <!-- Bottom Navigation -->
+        <nav class="bottom-nav">
+            <div class="nav-items">
+                <a href="#" class="nav-item active">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-clock"></i>
+                    <span>Jadwal</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-bell"></i>
+                    <span>Notifikasi</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-cog"></i>
+                    <span>Info</span>
+                </a>
+            </div>
+        </nav>
     </div>
-  );
 
-  return (
-    <div className="max-w-md mx-auto bg-gray-50 min-h-screen">
-      {/* Header */}
-      <div 
-        className="px-6 py-8 text-white relative overflow-hidden"
-        style={{ background: 'linear-gradient(45deg, #023259, #99bb1c)' }}
-      >
-        <div className="absolute inset-0 bg-black opacity-10"></div>
-        <div className="absolute top-0 left-0 w-full h-full">
-          <div className="animate-pulse absolute top-4 right-4 w-20 h-20 bg-white opacity-10 rounded-full"></div>
-          <div className="animate-pulse absolute bottom-4 left-4 w-16 h-16 bg-white opacity-5 rounded-full"></div>
-        </div>
-        
-        <div className="relative z-10">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-2xl font-bold">SIMO Schedule</h1>
-              <p className="text-blue-100 text-sm">Meeting Planner - View Only</p>
-              <div className="flex items-center space-x-2 mt-2">
-                <div className="flex items-center space-x-1">
-                  {isOnline ? (
-                    <Wifi className="w-4 h-4 text-green-300 animate-pulse" />
-                  ) : (
-                    <WifiOff className="w-4 h-4 text-red-300" />
-                  )}
-                  <span className="text-xs text-blue-100">
-                    {isLoading ? 'Connecting...' : isOnline ? 'Firebase Connected' : 'Offline Mode'}
-                  </span>
+    <!-- Bootstrap JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // Sample meeting data sesuai dengan struktur Firebase admin
+        const meetings = [
+            {
+                id: "1",
+                pembuat: "Dept.Perencanaan Strategis & Kinerja Organisasi",
+                tempat: "ZOOM",
+                audience: ["Daya Inara"],
+                keterangan: "Join Planning Session Roadmap RAKB",
+                tanggal: "2025-07-07",
+                jam: "14:30"
+            },
+            {
+                id: "2", 
+                pembuat: "DIVISI SIMO",
+                tempat: "Hotel Claro Makassar",
+                audience: ["Direksi Bank Sulselbar"],
+                keterangan: "Sosialisasi Inhouse Training PT Bank Sulselbar (Pemimpin Divisi, Claro)",
+                tanggal: "2025-07-08",
+                jam: "08:00"
+            },
+            {
+                id: "3",
+                pembuat: "Dept.Perencanaan Strategis & Kinerja Organisasi", 
+                tempat: "Ruang Rapat Lt 3 Gedung A PT.Bank Sulselbar",
+                audience: ["DCS", "DHC", "DDL", "DSY", "DIB", "DKK", "DRK", "SKK", "SKMR"],
+                keterangan: "Kick Off Meeting Pelaksanaan Penyusunan Dokumen Roadmap RAKB tahun 2026-2030 dan Kebijakan atau Ketentuan",
+                tanggal: "2025-07-08", 
+                jam: "10:00"
+            }
+        ];
+
+        // Utility functions
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('id-ID', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric'
+            });
+        }
+
+        function isToday(dateString) {
+            const today = new Date();
+            const meetingDate = new Date(dateString);
+            return today.toDateString() === meetingDate.toDateString();
+        }
+
+        function isUpcoming(dateString) {
+            const today = new Date();
+            const meetingDate = new Date(dateString);
+            return meetingDate > today;
+        }
+
+        function isOnlineLocation(tempat) {
+            return tempat && tempat.toLowerCase().includes('zoom');
+        }
+
+        function createMeetingCard(meeting, showDate = true) {
+            const isOnline = isOnlineLocation(meeting.tempat);
+            
+            return `
+                <div class="meeting-card">
+                    <div class="meeting-content">
+                        <div class="meeting-icon ${isOnline ? 'online' : 'offline'}">
+                            <i class="fas fa-${isOnline ? 'video' : 'map-marker-alt'}"></i>
+                        </div>
+                        <div class="meeting-details">
+                            ${showDate ? `
+                            <div class="meeting-time">
+                                <div class="time-badge">
+                                    <i class="fas fa-clock"></i>
+                                    <span>${meeting.jam}</span>
+                                </div>
+                                <span>•</span>
+                                <span>${formatDate(meeting.tanggal)}</span>
+                            </div>
+                            ` : ''}
+                            
+                            <h3 class="meeting-title">${meeting.keterangan}</h3>
+                            
+                            <div class="meeting-info">
+                                <div class="info-row">
+                                    <i class="fas fa-map-marker-alt info-icon"></i>
+                                    <span>${meeting.tempat}</span>
+                                </div>
+                                
+                                <div class="info-row">
+                                    <i class="fas fa-user info-icon"></i>
+                                    <span>Pembuat: ${meeting.pembuat}</span>
+                                </div>
+                                
+                                <div class="info-row">
+                                    <i class="fas fa-users info-icon"></i>
+                                    <span>Audience:</span>
+                                </div>
+                                <div class="audience-badges">
+                                    ${meeting.audience.map(aud => `<span class="audience-badge">${aud}</span>`).join('')}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="meeting-arrow">
+                            <i class="fas fa-chevron-right"></i>
+                        </div>
+                    </div>
                 </div>
-                <div className="text-xs text-blue-100">
-                  {currentTime.toLocaleTimeString('id-ID')}
-                </div>
-              </div>
-            </div>
-            <div className="flex space-x-3">
-              <button className="p-3 bg-white bg-opacity-20 rounded-2xl backdrop-blur-sm hover:bg-opacity-30 transition-all duration-300">
-                <Search className="w-5 h-5" />
-              </button>
-              <button className="p-3 bg-white bg-opacity-20 rounded-2xl backdrop-blur-sm hover:bg-opacity-30 transition-all duration-300">
-                <Filter className="w-5 h-5" />
-              </button>
-              <button className="p-3 bg-white bg-opacity-20 rounded-2xl backdrop-blur-sm hover:bg-opacity-30 transition-all duration-300 relative">
-                <Bell className="w-5 h-5" />
-                {meetings.length > 0 && (
-                  <>
-                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-ping"></div>
-                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></div>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+            `;
+        }
 
-      {/* Quick Stats */}
-      <div className="px-6 py-4 space-y-3">
-        <div className="grid grid-cols-2 gap-3">
-          <StatCard 
-            title="Total Rapat" 
-            value={stats.totalMeetings} 
-            color="bg-blue-500" 
-            icon={Calendar}
-          />
-          <StatCard 
-            title="Hari Ini" 
-            value={stats.todayMeetings} 
-            color="bg-green-500" 
-            icon={Clock}
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <StatCard 
-            title="Akan Datang" 
-            value={stats.upcomingMeetings} 
-            color="bg-orange-500" 
-            icon={Users}
-          />
-          <StatCard 
-            title="Pembuat" 
-            value="5" 
-            color="bg-purple-500" 
-            icon={Building}
-          />
-        </div>
-      </div>
+        // Filter meetings
+        const todayMeetings = meetings.filter(meeting => isToday(meeting.tanggal));
+        const upcomingMeetings = meetings.filter(meeting => isUpcoming(meeting.tanggal));
 
-      {/* Navigation Tabs */}
-      <div className="flex space-x-1 px-6 py-4 bg-white border-b border-gray-200">
-        {[
-          { id: 'today', label: 'Hari Ini', count: stats.todayMeetings, color: 'bg-green-500' },
-          { id: 'upcoming', label: 'Akan Datang', count: stats.upcomingMeetings, color: 'bg-orange-500' },
-          { id: 'all', label: 'Semua', count: stats.totalMeetings, color: 'bg-blue-500' }
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-sm font-medium transition-all ${
-              activeTab === tab.id
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            <span>{tab.label}</span>
-            {tab.count > 0 && (
-              <span className={`px-2 py-1 rounded-full text-xs ${
-                activeTab === tab.id ? 'bg-white bg-opacity-20' : `${tab.color} text-white`
-              }`}>
-                {tab.count}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* Content */}
-      <div className="px-6 py-4 space-y-4">
-        {activeTab === 'today' && (
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-gray-900">
-                Rapat Hari Ini
-              </h2>
-              <div className="flex items-center space-x-2">
-                <Clock className="w-5 h-5 text-blue-500" />
-                <span className="text-sm text-gray-600 font-medium">
-                  {currentTime.toLocaleDateString('id-ID')}
-                </span>
-              </div>
-            </div>
+        // Update stats
+        function updateStats() {
+            document.getElementById('total-meetings').textContent = meetings.length;
+            document.getElementById('today-meetings').textContent = todayMeetings.length;
+            document.getElementById('upcoming-meetings').textContent = upcomingMeetings.length;
             
-            {isLoading ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-                <p className="text-gray-500">Loading meetings...</p>
-              </div>
-            ) : todayMeetings.length > 0 ? (
-              <div className="space-y-4">
-                {todayMeetings.map((meeting) => (
-                  <MeetingCard key={meeting.id} meeting={meeting} showDate={false} />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500">Tidak ada rapat hari ini</p>
-                {!isOnline && <p className="text-sm text-gray-400 mt-2">Menampilkan data offline</p>}
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'upcoming' && (
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-gray-900">
-                Rapat Akan Datang
-              </h2>
-              <div className="bg-orange-100 px-3 py-1 rounded-full">
-                <span className="text-sm text-orange-600 font-medium">
-                  {upcomingMeetings.length} rapat
-                </span>
-              </div>
-            </div>
+            document.getElementById('today-badge').textContent = todayMeetings.length;
+            document.getElementById('upcoming-badge').textContent = upcomingMeetings.length;
+            document.getElementById('all-badge').textContent = meetings.length;
             
-            <div className="space-y-4">
-              {upcomingMeetings.map((meeting) => (
-                <MeetingCard key={meeting.id} meeting={meeting} />
-              ))}
-            </div>
-          </div>
-        )}
+            document.getElementById('upcoming-count').textContent = upcomingMeetings.length;
+            document.getElementById('all-count').textContent = meetings.length;
+        }
 
-        {activeTab === 'all' && (
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-gray-900">
-                Semua Rapat
-              </h2>
-              <div className="bg-blue-100 px-3 py-1 rounded-full">
-                <span className="text-sm text-blue-600 font-medium">
-                  {meetings.length} total
-                </span>
-              </div>
-            </div>
+        // Render meetings
+        function renderMeetings() {
+            // Today meetings
+            const todayList = document.getElementById('today-meetings-list');
+            if (todayMeetings.length > 0) {
+                todayList.innerHTML = todayMeetings.map(meeting => createMeetingCard(meeting, false)).join('');
+            }
+
+            // Upcoming meetings
+            const upcomingList = document.getElementById('upcoming-meetings-list');
+            upcomingList.innerHTML = upcomingMeetings.map(meeting => createMeetingCard(meeting)).join('');
+
+            // All meetings
+            const allList = document.getElementById('all-meetings-list');
+            allList.innerHTML = meetings.map(meeting => createMeetingCard(meeting)).join('');
+        }
+
+        // Tab functionality
+        function initTabs() {
+            const tabs = document.querySelectorAll('.nav-tab');
+            const contents = document.querySelectorAll('.tab-content');
+
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const targetTab = tab.dataset.tab;
+
+                    // Update active tab
+                    tabs.forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+
+                    // Update badge styles
+                    tabs.forEach(t => {
+                        const badge = t.querySelector('.tab-badge');
+                        if (t.classList.contains('active')) {
+                            badge.classList.remove('inactive');
+                        } else {
+                            badge.classList.add('inactive');
+                        }
+                    });
+
+                    // Show/hide content
+                    contents.forEach(content => {
+                        if (content.id === `${targetTab}-content`) {
+                            content.style.display = 'block';
+                        } else {
+                            content.style.display = 'none';
+                        }
+                    });
+                });
+            });
+        }
+
+        // Update time
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('current-time').textContent = now.toLocaleTimeString('id-ID');
+            document.getElementById('current-date').textContent = now.toLocaleDateString('id-ID');
+        }
+
+        // Initialize app
+        function init() {
+            updateStats();
+            renderMeetings();
+            initTabs();
+            updateTime();
             
-            <div className="space-y-4">
-              {meetings.map((meeting) => (
-                <MeetingCard key={meeting.id} meeting={meeting} />
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+            // Update time every second
+            setInterval(updateTime, 1000);
+        }
 
-      {/* Bottom Navigation */}
-      <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-md bg-white border-t border-gray-200 px-6 py-4">
-        <div className="flex justify-around">
-          {[
-            { icon: Calendar, label: 'Dashboard', active: true },
-            { icon: Clock, label: 'Jadwal' },
-            { icon: Bell, label: 'Notifikasi' },
-            { icon: Settings, label: 'Info' }
-          ].map((item, index) => (
-            <button 
-              key={index} 
-              className={`flex flex-col items-center space-y-1 ${
-                item.active ? 'text-blue-600' : 'text-gray-600'
-              }`}
-            >
-              <item.icon className="w-5 h-5" />
-              <span className="text-xs">{item.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Bottom padding */}
-      <div className="h-20"></div>
-    </div>
-  );
-};
-
-export default SIMOSchedule;
+        // Start app when DOM is loaded
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
