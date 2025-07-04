@@ -735,11 +735,36 @@
     <!-- Bootstrap JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
 
-    <script>
-        // Sample meeting data sesuai dengan struktur Firebase admin
-        const meetings = [
+    <!-- Firebase SDKs -->
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+        import { getFirestore, collection, getDocs, query, orderBy, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+
+        // Firebase configuration - sama dengan aplikasi admin Anda
+        const firebaseConfig = {
+            apiKey: "AIzaSyAmTSUEiLX0K1A8mPnN0citZmDAuzLkL_A",
+            authDomain: "rapat-simo-15b35.firebaseapp.com",
+            projectId: "rapat-simo-15b35",
+            storageBucket: "rapat-simo-15b35.firebasestorage.app",
+            messagingSenderId: "471527167515",
+            appId: "1:471527167515:web:7766a3f2ee1d6280e9cabe",
+            measurementId: "G-FCPTBCPHMB"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Global variables
+        let meetings = [];
+        let isOnline = false;
+        let isLoading = true;
+
+        // Sample data sebagai fallback jika Firebase gagal
+        const fallbackMeetings = [
             {
-                id: "1",
+                id: "fallback-1",
                 pembuat: "Dept.Perencanaan Strategis & Kinerja Organisasi",
                 tempat: "ZOOM",
                 audience: ["Daya Inara"],
@@ -748,24 +773,146 @@
                 jam: "14:30"
             },
             {
-                id: "2", 
+                id: "fallback-2", 
                 pembuat: "DIVISI SIMO",
                 tempat: "Hotel Claro Makassar",
                 audience: ["Direksi Bank Sulselbar"],
-                keterangan: "Sosialisasi Inhouse Training PT Bank Sulselbar (Pemimpin Divisi, Claro)",
+                keterangan: "Sosialisasi Inhouse Training PT Bank Sulselbar",
                 tanggal: "2025-07-08",
                 jam: "08:00"
             },
             {
-                id: "3",
+                id: "fallback-3",
                 pembuat: "Dept.Perencanaan Strategis & Kinerja Organisasi", 
                 tempat: "Ruang Rapat Lt 3 Gedung A PT.Bank Sulselbar",
                 audience: ["DCS", "DHC", "DDL", "DSY", "DIB", "DKK", "DRK", "SKK", "SKMR"],
-                keterangan: "Kick Off Meeting Pelaksanaan Penyusunan Dokumen Roadmap RAKB tahun 2026-2030 dan Kebijakan atau Ketentuan",
+                keterangan: "Kick Off Meeting Pelaksanaan Penyusunan Dokumen Roadmap RAKB tahun 2026-2030",
                 tanggal: "2025-07-08", 
                 jam: "10:00"
             }
         ];
+
+        // Load Firebase data dengan real-time listener
+        function loadFirebaseData() {
+            try {
+                showLoading(true);
+                updateConnectionStatus('connecting');
+
+                // Create query untuk mengambil meetings
+                const meetingsQuery = query(
+                    collection(db, "meetings"), 
+                    orderBy("tanggal", "asc")
+                );
+
+                // Listen untuk real-time updates
+                const unsubscribe = onSnapshot(meetingsQuery, 
+                    (querySnapshot) => {
+                        console.log('Firebase data received:', querySnapshot.size, 'documents');
+                        
+                        meetings = [];
+                        querySnapshot.forEach((doc) => {
+                            const data = doc.data();
+                            meetings.push({
+                                id: doc.id,
+                                pembuat: data.pembuat || '',
+                                tempat: data.tempat || '',
+                                audience: Array.isArray(data.audience) ? data.audience : [data.audience || ''],
+                                keterangan: data.keterangan || '',
+                                tanggal: data.tanggal || '',
+                                jam: data.jam || '',
+                                createdAt: data.createdAt,
+                                timestamp: data.timestamp
+                            });
+                        });
+                        
+                        isOnline = true;
+                        isLoading = false;
+                        
+                        console.log('Loaded meetings:', meetings);
+                        updateConnectionStatus('online');
+                        updateUI();
+                        showLoading(false);
+                    }, 
+                    (error) => {
+                        console.error("Error loading Firebase data:", error);
+                        handleFirebaseError();
+                    }
+                );
+
+                return unsubscribe;
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+                handleFirebaseError();
+            }
+        }
+
+        // Handle Firebase error - fallback ke sample data
+        function handleFirebaseError() {
+            isOnline = false;
+            isLoading = false;
+            meetings = fallbackMeetings;
+            
+            updateConnectionStatus('offline');
+            updateUI();
+            showLoading(false);
+            
+            console.log('Using fallback data due to Firebase error');
+        }
+
+        // Update connection status di header
+        function updateConnectionStatus(status) {
+            const statusElement = document.querySelector('.status-online');
+            const iconElement = statusElement.querySelector('i');
+            const textElement = statusElement.querySelector('span');
+
+            switch(status) {
+                case 'connecting':
+                    iconElement.className = 'fas fa-circle-notch fa-spin status-icon';
+                    textElement.textContent = 'Connecting...';
+                    statusElement.style.color = '#fbbf24';
+                    break;
+                case 'online':
+                    iconElement.className = 'fas fa-wifi status-icon';
+                    textElement.textContent = 'Firebase Connected';
+                    statusElement.style.color = '#86efac';
+                    break;
+                case 'offline':
+                    iconElement.className = 'fas fa-wifi-slash status-icon';
+                    textElement.textContent = 'Offline Mode';
+                    statusElement.style.color = '#f87171';
+                    break;
+            }
+        }
+
+        // Show/hide loading spinner
+        function showLoading(show) {
+            const existingSpinner = document.getElementById('loading-spinner');
+            
+            if (show && !existingSpinner) {
+                const spinner = document.createElement('div');
+                spinner.id = 'loading-spinner';
+                spinner.className = 'loading-state';
+                spinner.innerHTML = `
+                    <div class="loading-spinner"></div>
+                    <p style="color: #64748b;">Loading meetings from Firebase...</p>
+                `;
+                
+                // Insert spinner di semua tab content
+                const tabContents = document.querySelectorAll('.tab-content');
+                tabContents.forEach(content => {
+                    content.style.display = 'none';
+                });
+                
+                const contentSection = document.querySelector('.content-section');
+                contentSection.appendChild(spinner);
+            } else if (!show && existingSpinner) {
+                existingSpinner.remove();
+                
+                // Show active tab content
+                const activeTab = document.querySelector('.nav-tab.active').dataset.tab;
+                document.getElementById(`${activeTab}-content`).style.display = 'block';
+            }
+        }
 
         // Utility functions
         function formatDate(dateString) {
@@ -790,7 +937,12 @@
         }
 
         function isOnlineLocation(tempat) {
-            return tempat && tempat.toLowerCase().includes('zoom');
+            return tempat && (
+                tempat.toLowerCase().includes('zoom') ||
+                tempat.toLowerCase().includes('teams') ||
+                tempat.toLowerCase().includes('meet') ||
+                tempat.toLowerCase().includes('google')
+            );
         }
 
         function createMeetingCard(meeting, showDate = true) {
@@ -844,12 +996,13 @@
             `;
         }
 
-        // Filter meetings
-        const todayMeetings = meetings.filter(meeting => isToday(meeting.tanggal));
-        const upcomingMeetings = meetings.filter(meeting => isUpcoming(meeting.tanggal));
+        // Update UI dengan data terbaru
+        function updateUI() {
+            // Filter meetings
+            const todayMeetings = meetings.filter(meeting => isToday(meeting.tanggal));
+            const upcomingMeetings = meetings.filter(meeting => isUpcoming(meeting.tanggal));
 
-        // Update stats
-        function updateStats() {
+            // Update stats
             document.getElementById('total-meetings').textContent = meetings.length;
             document.getElementById('today-meetings').textContent = todayMeetings.length;
             document.getElementById('upcoming-meetings').textContent = upcomingMeetings.length;
@@ -860,23 +1013,66 @@
             
             document.getElementById('upcoming-count').textContent = upcomingMeetings.length;
             document.getElementById('all-count').textContent = meetings.length;
+
+            // Render meetings
+            renderTodayMeetings(todayMeetings);
+            renderUpcomingMeetings(upcomingMeetings);
+            renderAllMeetings(meetings);
         }
 
-        // Render meetings
-        function renderMeetings() {
-            // Today meetings
+        function renderTodayMeetings(todayMeetings) {
             const todayList = document.getElementById('today-meetings-list');
+            
             if (todayMeetings.length > 0) {
                 todayList.innerHTML = todayMeetings.map(meeting => createMeetingCard(meeting, false)).join('');
+            } else {
+                todayList.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">
+                            <i class="fas fa-calendar-times"></i>
+                        </div>
+                        <div class="empty-title">Tidak ada rapat hari ini</div>
+                        <div class="empty-subtitle">Nikmati hari yang santai! 🎉</div>
+                        ${!isOnline ? '<div class="empty-subtitle" style="margin-top: 1rem; color: #f87171;">Menampilkan data offline</div>' : ''}
+                    </div>
+                `;
             }
+        }
 
-            // Upcoming meetings
+        function renderUpcomingMeetings(upcomingMeetings) {
             const upcomingList = document.getElementById('upcoming-meetings-list');
-            upcomingList.innerHTML = upcomingMeetings.map(meeting => createMeetingCard(meeting)).join('');
+            
+            if (upcomingMeetings.length > 0) {
+                upcomingList.innerHTML = upcomingMeetings.map(meeting => createMeetingCard(meeting)).join('');
+            } else {
+                upcomingList.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">
+                            <i class="fas fa-calendar-plus"></i>
+                        </div>
+                        <div class="empty-title">Tidak ada rapat yang dijadwalkan</div>
+                        <div class="empty-subtitle">Semua rapat sudah selesai</div>
+                    </div>
+                `;
+            }
+        }
 
-            // All meetings
+        function renderAllMeetings(allMeetings) {
             const allList = document.getElementById('all-meetings-list');
-            allList.innerHTML = meetings.map(meeting => createMeetingCard(meeting)).join('');
+            
+            if (allMeetings.length > 0) {
+                allList.innerHTML = allMeetings.map(meeting => createMeetingCard(meeting)).join('');
+            } else {
+                allList.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">
+                            <i class="fas fa-calendar"></i>
+                        </div>
+                        <div class="empty-title">Tidak ada data rapat</div>
+                        <div class="empty-subtitle">Silakan tambah rapat di aplikasi admin</div>
+                    </div>
+                `;
+            }
         }
 
         // Tab functionality
@@ -923,17 +1119,32 @@
 
         // Initialize app
         function init() {
-            updateStats();
-            renderMeetings();
+            console.log('Initializing SIMO Schedule Dashboard...');
+            
             initTabs();
             updateTime();
             
             // Update time every second
             setInterval(updateTime, 1000);
+            
+            // Load Firebase data
+            loadFirebaseData();
+            
+            console.log('Dashboard initialized successfully');
         }
 
         // Start app when DOM is loaded
         document.addEventListener('DOMContentLoaded', init);
+
+        // Handle page unload
+        window.addEventListener('beforeunload', () => {
+            console.log('Dashboard closing...');
+        });
+    </script>
+
+    <script>
+        // Non-module scripts untuk compatibility
+        console.log('SIMO Schedule Dashboard loaded');
     </script>
 </body>
 </html>
