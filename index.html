@@ -42,7 +42,7 @@ const SIMOSchedule = () => {
     {
       id: "3",
       pembuat: "Dept.Perencanaan Strategis & Kinerja Organisasi", 
-      tempat: "Ruang Rapat Lt 3 Gedung A PT.Bank Sulselbar",
+      tempat: "Ruang Rapat Lt 3 Gedung A PT Bank Sulselbar",
       audience: ["DCS", "DHC", "DDL", "DSY", "DIB", "DKK", "DRK", "SKK", "SKMR"],
       keterangan: "Kick Off Meeting Pelaksanaan Penyusunan Dokumen Roadmap RAKB tahun 2026-2030 dan Kebijakan atau Ketentuan",
       tanggal: "2025-07-08", 
@@ -55,43 +55,49 @@ const SIMOSchedule = () => {
     try {
       setIsLoading(true);
       
-      // Import Firebase modules dynamically
-      const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js');
-      const { getFirestore, collection, getDocs, query, orderBy, onSnapshot } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js');
+      // Import Firebase modules
+      const firebaseApp = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js');
+      const firestore = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js');
       
       // Initialize Firebase
-      const app = initializeApp(firebaseConfig);
-      const db = getFirestore(app);
+      const app = firebaseApp.initializeApp(firebaseConfig);
+      const db = firestore.getFirestore(app);
       
-      // Create query to get meetings ordered by date
-      const meetingsQuery = query(collection(db, "meetings"), orderBy("tanggal", "asc"));
+      // Create query
+      const meetingsQuery = firestore.query(
+        firestore.collection(db, "meetings"), 
+        firestore.orderBy("tanggal", "asc")
+      );
       
       // Listen to real-time updates
-      const unsubscribe = onSnapshot(meetingsQuery, (querySnapshot) => {
-        const meetingsData = [];
-        querySnapshot.forEach((doc) => {
-          meetingsData.push({
-            id: doc.id,
-            ...doc.data()
+      const unsubscribe = firestore.onSnapshot(meetingsQuery, 
+        (querySnapshot) => {
+          const meetingsData = [];
+          querySnapshot.forEach((doc) => {
+            meetingsData.push({
+              id: doc.id,
+              ...doc.data()
+            });
           });
-        });
-        
-        setMeetings(meetingsData);
-        setIsOnline(true);
-        setIsLoading(false);
-        console.log(`Loaded ${meetingsData.length} meetings from Firebase`);
-      }, (error) => {
-        console.error("Error loading Firebase data:", error);
-        setIsOnline(false);
-        setMeetings(sampleMeetings); // Fallback to sample data
-        setIsLoading(false);
-      });
+          
+          setMeetings(meetingsData);
+          setIsOnline(true);
+          setIsLoading(false);
+          console.log(`Loaded ${meetingsData.length} meetings from Firebase`);
+        }, 
+        (error) => {
+          console.error("Error loading Firebase data:", error);
+          setIsOnline(false);
+          setMeetings(sampleMeetings);
+          setIsLoading(false);
+        }
+      );
       
       return unsubscribe;
     } catch (error) {
       console.error("Firebase connection failed:", error);
       setIsOnline(false);
-      setMeetings(sampleMeetings); // Fallback to sample data
+      setMeetings(sampleMeetings);
       setIsLoading(false);
     }
   };
@@ -240,7 +246,7 @@ const SIMOSchedule = () => {
 
   return (
     <div className="max-w-md mx-auto bg-gray-50 min-h-screen">
-      {/* Header dengan gradient sesuai color palette admin */}
+      {/* Header */}
       <div 
         className="px-6 py-8 text-white relative overflow-hidden"
         style={{ background: 'linear-gradient(45deg, #023259, #99bb1c)' }}
@@ -253,7 +259,7 @@ const SIMOSchedule = () => {
         
         <div className="relative z-10">
           <div className="flex items-center justify-between mb-6">
-            <div className="animate-slideInLeft">
+            <div>
               <h1 className="text-2xl font-bold">SIMO Schedule</h1>
               <p className="text-blue-100 text-sm">Meeting Planner - View Only</p>
               <div className="flex items-center space-x-2 mt-2">
@@ -272,14 +278,14 @@ const SIMOSchedule = () => {
                 </div>
               </div>
             </div>
-            <div className="flex space-x-3 animate-slideInRight">
-              <button className="p-3 bg-white bg-opacity-20 rounded-2xl backdrop-blur-sm hover:bg-opacity-30 transition-all duration-300 transform hover:scale-110">
+            <div className="flex space-x-3">
+              <button className="p-3 bg-white bg-opacity-20 rounded-2xl backdrop-blur-sm hover:bg-opacity-30 transition-all duration-300">
                 <Search className="w-5 h-5" />
               </button>
-              <button className="p-3 bg-white bg-opacity-20 rounded-2xl backdrop-blur-sm hover:bg-opacity-30 transition-all duration-300 transform hover:scale-110">
+              <button className="p-3 bg-white bg-opacity-20 rounded-2xl backdrop-blur-sm hover:bg-opacity-30 transition-all duration-300">
                 <Filter className="w-5 h-5" />
               </button>
-              <button className="p-3 bg-white bg-opacity-20 rounded-2xl backdrop-blur-sm hover:bg-opacity-30 transition-all duration-300 transform hover:scale-110 relative">
+              <button className="p-3 bg-white bg-opacity-20 rounded-2xl backdrop-blur-sm hover:bg-opacity-30 transition-all duration-300 relative">
                 <Bell className="w-5 h-5" />
                 {meetings.length > 0 && (
                   <>
@@ -457,27 +463,6 @@ const SIMOSchedule = () => {
 
       {/* Bottom padding */}
       <div className="h-20"></div>
-
-      {/* CSS untuk animasi header */}
-      <style jsx>{`
-        @keyframes slideInLeft {
-          from { opacity: 0; transform: translateX(-30px); }
-          to { opacity: 1; transform: translateX(0); }
-        }
-        
-        @keyframes slideInRight {
-          from { opacity: 0; transform: translateX(30px); }
-          to { opacity: 1; transform: translateX(0); }
-        }
-        
-        .animate-slideInLeft { 
-          animation: slideInLeft 0.6s ease-out; 
-        }
-        
-        .animate-slideInRight { 
-          animation: slideInRight 0.6s ease-out; 
-        }
-      `}</style>
     </div>
   );
 };
